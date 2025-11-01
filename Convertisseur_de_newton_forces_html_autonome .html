@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Convertisseurs – Force, Charge linéique & Moment</title>
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --muted:#8b949e; --text:#e6edf3; --line:#30363d; --accent:#58a6ff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica,Arial;
+      background:var(--bg); color:var(--text);
+      display:grid; place-items:center; padding:24px;
+    }
+    .wrapper{ width:100%; max-width:820px; display:grid; gap:16px; }
+    .card{
+      background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px 26px;
+      box-shadow:0 6px 18px rgba(0,0,0,.45);
+    }
+    h1{margin:0 0 4px; color:var(--accent)}
+    h2{margin:0 0 10px; font-size:1.1rem; color:var(--text)}
+    p.sub{margin:0 0 16px; color:var(--muted)}
+
+    .grid{ display:grid; grid-template-columns: 1fr 190px; gap:10px; }
+    @media (max-width:560px){ .grid{ grid-template-columns:1fr; } }
+
+    input, select{
+      width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+      background:#0d1117; color:var(--text); font-size:1rem; transition:border-color .2s, box-shadow .2s;
+    }
+    input:focus, select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(88,166,255,.35); }
+
+    .results{ display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:12px; }
+    .tile{ background:#21262d; border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+    .label{ color:var(--muted); font-size:.85rem }
+    .value{ margin-top:6px; font-weight:700; word-break:break-word }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Convertisseur de force -->
+    <div class="card" id="force-card">
+      <h1>Convertisseur de force</h1>
+      <p class="sub">Convertissez entre <strong>Newton (N)</strong>, <strong>décanewton (daN)</strong> et <strong>kilonewton (kN)</strong>.</p>
+
+      <div class="grid" aria-label="Entrées conversion force">
+        <input type="text" id="valForce" placeholder="Entrez une valeur (ex. 250, 3.5e3)" inputmode="decimal" />
+        <select id="unitForce">
+          <option value="N">Newton (N)</option>
+          <option value="daN">Décanewton (daN)</option>
+          <option value="kN">Kilonewton (kN)</option>
+        </select>
+      </div>
+
+      <div class="results" aria-live="polite" aria-atomic="true">
+        <div class="tile"><div class="label">Newton (N)</div><div class="value" id="outFN">—</div></div>
+        <div class="tile"><div class="label">Décanewton (daN)</div><div class="value" id="outFdaN">—</div></div>
+        <div class="tile"><div class="label">Kilonewton (kN)</div><div class="value" id="outFkN">—</div></div>
+      </div>
+    </div>
+
+    <!-- Convertisseur de charge linéique -->
+    <div class="card" id="linear-card">
+      <h2>Convertisseur de charge linéique</h2>
+      <p class="sub">Convertissez entre <strong>kN/m</strong> et <strong>daN/m</strong>. (Rappel : <code>1 kN/m = 100 daN/m</code>)</p>
+
+      <div class="grid" aria-label="Entrées conversion charge linéique">
+        <input type="text" id="valLinear" placeholder="Entrez une valeur (ex. 5, 1.25e2)" inputmode="decimal" />
+        <select id="unitLinear">
+          <option value="kNpm">kN/m</option>
+          <option value="daNpm">daN/m</option>
+        </select>
+      </div>
+
+      <div class="results" aria-live="polite" aria-atomic="true">
+        <div class="tile"><div class="label">kN/m</div><div class="value" id="outLkNpm">—</div></div>
+        <div class="tile"><div class="label">daN/m</div><div class="value" id="outLdaNpm">—</div></div>
+      </div>
+    </div>
+
+    <!-- Convertisseur de moment (couple) -->
+    <div class="card" id="moment-card">
+      <h2>Convertisseur de moment (couple)</h2>
+      <p class="sub">Convertissez entre <strong>daN·m</strong> et <strong>kN·m</strong>. (Rappel : <code>1 kN·m = 100 daN·m</code>)</p>
+
+      <div class="grid" aria-label="Entrées conversion moment">
+        <input type="text" id="valMoment" placeholder="Entrez une valeur (ex. 12, 4e3)" inputmode="decimal" />
+        <select id="unitMoment">
+          <option value="kNxm">kN·m</option>
+          <option value="daNxm">daN·m</option>
+        </select>
+      </div>
+
+      <div class="results" aria-live="polite" aria-atomic="true">
+        <div class="tile"><div class="label">kN·m</div><div class="value" id="outMkNxm">—</div></div>
+        <div class="tile"><div class="label">daN·m</div><div class="value" id="outMdaNxm">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Helpers communs
+    const fmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 12, useGrouping: true });
+    const $ = (id) => document.getElementById(id);
+    const parseSmart = (v) => {
+      if (typeof v !== 'string') return NaN;
+      const cleaned = v.replace(/\s+/g, '').replace(/,/g, '.').replace(/−/g, '-');
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : NaN;
+    };
+    const pretty = (x) => {
+      if (!Number.isFinite(x)) return '—';
+      const ax = Math.abs(x);
+      if (ax !== 0 && (ax < 1e-6 || ax >= 1e9)) {
+        const s = x.toExponential(6);
+        const [coef, exp] = s.split('e');
+        return `${coef.replace('.', ',')} × 10^${parseInt(exp,10)}`;
+      }
+      return fmt.format(x);
+    };
+
+    // ===== Convertisseur de force
+    const FACT_FORCE_TO_N = { N:1, daN:10, kN:1000 };
+    const valForce = $('valForce');
+    const unitForce = $('unitForce');
+
+    function convertForce(){
+      const v = parseSmart(valForce.value);
+      const u = unitForce.value;
+      if (!Number.isFinite(v)) { $('outFN').textContent='—'; $('outFdaN').textContent='—'; $('outFkN').textContent='—'; return; }
+      const N = v * FACT_FORCE_TO_N[u];
+      $('outFN').textContent   = pretty(N);
+      $('outFdaN').textContent = pretty(N / FACT_FORCE_TO_N.daN);
+      $('outFkN').textContent  = pretty(N / FACT_FORCE_TO_N.kN);
+    }
+
+    valForce.addEventListener('input', convertForce);
+    unitForce.addEventListener('change', convertForce);
+
+    // ===== Convertisseur kN/m ↔ daN/m
+    const RATIO_KN_DAN = 100; // 1 kN = 100 daN → idem pour /m et ·m
+    const valLinear = $('valLinear');
+    const unitLinear = $('unitLinear');
+
+    function convertLinear(){
+      const v = parseSmart(valLinear.value);
+      const u = unitLinear.value; // 'kNpm' ou 'daNpm'
+      if (!Number.isFinite(v)) { $('outLkNpm').textContent='—'; $('outLdaNpm').textContent='—'; return; }
+      const in_kNpm = (u === 'kNpm') ? v : v / RATIO_KN_DAN; // daN/m → kN/m
+      const in_daNpm = in_kNpm * RATIO_KN_DAN;
+      $('outLkNpm').textContent = pretty(in_kNpm);
+      $('outLdaNpm').textContent = pretty(in_daNpm);
+    }
+
+    valLinear.addEventListener('input', convertLinear);
+    unitLinear.addEventListener('change', convertLinear);
+
+    // ===== Convertisseur de moment (daN·m ↔ kN·m)
+    const valMoment = $('valMoment');
+    const unitMoment = $('unitMoment');
+
+    function convertMoment(){
+      const v = parseSmart(valMoment.value);
+      const u = unitMoment.value; // 'kNxm' ou 'daNxm'
+      if (!Number.isFinite(v)) { $('outMkNxm').textContent='—'; $('outMdaNxm').textContent='—'; return; }
+      const in_kNxm = (u === 'kNxm') ? v : v / RATIO_KN_DAN; // daN·m → kN·m
+      const in_daNxm = in_kNxm * RATIO_KN_DAN;
+      $('outMkNxm').textContent = pretty(in_kNxm);
+      $('outMdaNxm').textContent = pretty(in_daNxm);
+    }
+
+    valMoment.addEventListener('input', convertMoment);
+    unitMoment.addEventListener('change', convertMoment);
+
+    // Valeurs par défaut pour démonstration
+    valForce.value = '1';
+    convertForce();
+    valLinear.value = '1';
+    convertLinear();
+    valMoment.value = '1';
+    convertMoment();
+  </script>
+</body>
+</html>
